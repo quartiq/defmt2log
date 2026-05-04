@@ -1,7 +1,7 @@
 use std::{collections::HashMap, fs, path::Path, sync::Once};
 
 use crate::{InitError, State};
-use defmt_decoder::{Locations, StringEntry, Table, TableEntry, Tag};
+use defmt_decoder::{Locations, Table, Tag};
 use object::{
     BinaryFormat, Object, ObjectKind, ObjectSection, ObjectSegment, ObjectSymbol, SectionIndex,
     SectionKind, SymbolFlags, SymbolKind, SymbolScope,
@@ -142,12 +142,9 @@ fn build_synthetic_table(
     let elf = synthetic
         .write()
         .map_err(|err| InitError::ParseTable(err.to_string()))?;
-    let mut table = Table::parse(&elf)
+    let table = Table::parse(&elf)
         .map_err(|err| InitError::ParseTable(err.to_string()))?
         .ok_or_else(|| InitError::ParseTable("synthetic ELF lost `.defmt`".to_owned()))?;
-    if !table.has_timestamp() {
-        table.set_timestamp_entry(host_timestamp_entry());
-    }
 
     Ok(Some(ParsedTable {
         table,
@@ -429,13 +426,6 @@ fn skip_symbol(name: &str) -> bool {
         || name.starts_with("$d.")
         || name.starts_with("_defmt")
         || name.starts_with("__DEFMT_MARKER")
-}
-
-fn host_timestamp_entry() -> TableEntry {
-    TableEntry::new(
-        StringEntry::new(Tag::Timestamp, "{=u64:us}".to_owned()),
-        "defmt2log::timestamp".to_owned(),
-    )
 }
 
 fn symbol_tag(raw: &str) -> Result<Option<Tag>, InitError> {

@@ -15,7 +15,7 @@ thread_local! {
 #[defmt::global_logger]
 struct HostLogger;
 
-defmt::timestamp!("{=u64:us}", 0u64);
+defmt::timestamp!("");
 
 fn emit(raw: &[u8]) {
     let state = crate::state();
