@@ -8,11 +8,6 @@ repository = "https://github.com/quartiq/defmt2log"
 edition = "2024"
 readme = "README.md"
 
-[[bin]]
-name = "smoke_helper"
-path = "src/bin/smoke_helper.rs"
-test = false
-
 [dependencies]
 defmt = "1.0.1"
 defmt-decoder = "1.1.0"
