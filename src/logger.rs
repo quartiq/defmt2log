@@ -1,10 +1,6 @@
-use std::cell::RefCell;
-
-use defmt::Logger;
-use defmt_decoder::{DecodeError, Frame, Location};
+use defmt_parser::Level as DefmtLevel;
 use log::Level;
-
-use crate::state;
+use std::cell::RefCell;
 
 #[derive(Default)]
 struct ThreadState {
@@ -21,43 +17,28 @@ struct HostLogger;
 
 defmt::timestamp!("{=u64:us}", 0u64);
 
-fn level(frame: &Frame<'_>) -> Level {
-    match frame.level() {
-        Some(defmt_parser::Level::Trace) => Level::Trace,
-        Some(defmt_parser::Level::Debug) => Level::Debug,
-        Some(defmt_parser::Level::Info) => Level::Info,
-        Some(defmt_parser::Level::Warn) => Level::Warn,
-        Some(defmt_parser::Level::Error) => Level::Error,
-        None => Level::Info,
-    }
-}
-
-fn location<'a>(frame: &Frame<'_>) -> Option<&'a Location> {
-    state()
-        .locations
-        .as_ref()
-        .and_then(|locations| locations.get(&frame.index()))
-}
-
 fn emit(raw: &[u8]) {
-    let state = state();
+    let state = crate::state();
     match state.table.decode(raw) {
         Ok((frame, consumed)) if consumed == raw.len() => {
-            let location = location(&frame);
-            let module = location.map(|location| location.module.as_str());
-            let file = location.and_then(|location| location.file.to_str());
-            let line = location.and_then(|location| u32::try_from(location.line).ok());
-            let level = level(&frame);
-            let message = frame.display_message().to_string();
-            let args = format_args!("{message}");
+            let location = state.locations.as_ref().and_then(|l| l.get(&frame.index()));
+            let level = match frame.level() {
+                Some(DefmtLevel::Trace) => Level::Trace,
+                Some(DefmtLevel::Debug) => Level::Debug,
+                Some(DefmtLevel::Info) => Level::Info,
+                Some(DefmtLevel::Warn) => Level::Warn,
+                Some(DefmtLevel::Error) => Level::Error,
+                None => Level::Info,
+            };
+            let module = location.map(|l| l.module.as_str());
             log::logger().log(
                 &log::Record::builder()
-                    .args(args)
+                    .args(format_args!("{}", frame.display_message().to_string()))
                     .level(level)
                     .target(module.unwrap_or("defmt"))
                     .module_path(module)
-                    .file(file)
-                    .line(line)
+                    .file(location.and_then(|l| l.file.to_str()))
+                    .line(location.and_then(|l| u32::try_from(l.line).ok()))
                     .build(),
             );
         }
@@ -67,10 +48,10 @@ fn emit(raw: &[u8]) {
                 raw.len()
             );
         }
-        Err(DecodeError::UnexpectedEof) => {
+        Err(defmt_decoder::DecodeError::UnexpectedEof) => {
             log::warn!("defmt2log saw incomplete raw frame of {} bytes", raw.len());
         }
-        Err(DecodeError::Malformed) => {
+        Err(defmt_decoder::DecodeError::Malformed) => {
             log::warn!(
                 "defmt2log saw malformed raw frame of {} bytes: {:02x?}; indices={:?}; has_timestamp={}",
                 raw.len(),
@@ -85,7 +66,7 @@ fn emit(raw: &[u8]) {
 // Safety: `defmt` serializes access through `acquire`/`write`/`release`. We
 // keep one raw-frame buffer per thread and only touch it while the thread is in
 // the acquired state.
-unsafe impl Logger for HostLogger {
+unsafe impl defmt::Logger for HostLogger {
     fn acquire() {
         THREAD.with(|thread| {
             let mut thread = thread.borrow_mut();
@@ -94,7 +75,7 @@ unsafe impl Logger for HostLogger {
                 "defmt logger acquired twice in one thread"
             );
             thread.acquired = true;
-            thread.raw.clear();
+            assert!(thread.raw.is_empty());
         });
     }
 

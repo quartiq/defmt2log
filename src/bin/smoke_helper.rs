@@ -1,4 +1,3 @@
-use defmt::println;
 use log::{LevelFilter, Log, Metadata, Record};
 
 struct Logger;
@@ -34,5 +33,7 @@ fn main() {
         None => defmt2log::init_from_current_exe().unwrap(),
     }
 
-    println!("word {=u32:#010x}", 0x1234u32);
+    defmt::println!("word {=u32:#010x}", 0x1234u32);
+    defmt::trace!("foo {=str}", "foo");
+    defmt::error!("bar {=u8}", 99);
 }

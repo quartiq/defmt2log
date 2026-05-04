@@ -330,26 +330,26 @@ fn mapped_executable_base(path: &Path) -> Result<u64, InitError> {
         let Some(range) = parts.next() else {
             continue;
         };
-        let _perms = parts.next();
-        let Some(offset) = parts.next() else {
+        let Some((start, _end)) = range.split_once('-') else {
             continue;
         };
-        let _dev = parts.next();
-        let _inode = parts.next();
-        let Some(mapped_path) = parts.next() else {
+        let _perms = parts.next();
+        let Some(offset) = parts.next() else {
             continue;
         };
         if offset != "00000000" {
             continue;
         }
+        let _dev = parts.next();
+        let _inode = parts.next();
+        let Some(mapped_path) = parts.next() else {
+            continue;
+        };
         let mapped = Path::new(mapped_path);
         let mapped = fs::canonicalize(mapped).unwrap_or_else(|_| mapped.to_path_buf());
         if mapped != expected {
             continue;
         }
-        let Some((start, _end)) = range.split_once('-') else {
-            continue;
-        };
         let start = u64::from_str_radix(start, 16).map_err(|err| {
             InitError::ParseTable(format!("failed to parse `/proc/self/maps` address: {err}"))
         })?;

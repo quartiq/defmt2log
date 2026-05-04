@@ -10,7 +10,8 @@ fn helper_binary_decodes_typed_hints_and_location() {
     assert!(output.status.success(), "{output:?}");
 
     let stderr = String::from_utf8(output.stderr).unwrap();
-    let line = stderr.trim();
+    let lines: Vec<_> = stderr.trim().lines().collect();
+    let line = lines[0];
     let parts: Vec<_> = line.split('|').collect();
     assert_eq!(parts.len(), 6, "unexpected output: {line}");
     assert_eq!(parts[0], "INFO");

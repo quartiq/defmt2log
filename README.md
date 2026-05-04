@@ -29,7 +29,7 @@ defmt::info!("word {=u32:#010x}", 0x1234u32);
 # }
 ```
 
-The example is `no_run` because rustdoc and libtest have special host-side
+This example is `no_run` because rustdoc and libtest have special host-side
 constraints:
 
 - normal debug and release host binaries work
@@ -42,7 +42,7 @@ constraints:
   table to decode at runtime; those split metadata sections are dead-stripped
   from the final doctest executable
 
-Use a normal host binary or let an integration test spawn one.
+Use a normal host example or binary or spawn the host binary in an integration test.
 
 Recommended default:
 
@@ -55,6 +55,7 @@ Recommended default:
   `defmt::{trace,debug,info,warn,error}!` output is compiled out entirely; in
   that case `defmt2log` may still initialize successfully, but there is
   nothing for it to decode
+- `DEFMT_LOG=off` and no `defmt::println!()` removes the need for a `defmt` `#[global_logger]`
 
 ## Filters
 
@@ -80,7 +81,9 @@ callsites that `DEFMT_LOG` compiled out.
 
 ## Limitations
 
-- intended for normal host binaries first
+- intended for normal host binaries first: no unittests, doctests yet
+- it's typically less efficient than pure `log`; the overhead is
+  the sum of the defmt overheads: serialization, deserialization, and formatting
 - `init_from_current_exe()` is Linux-oriented today:
   the split-`.defmt.*` synthetic fallback depends on `/proc/self/maps`
 - `init_from_current_exe()` is the normal Linux host path in both debug and
