@@ -21,7 +21,6 @@ fn emit(raw: &[u8]) {
     let state = crate::state();
     match state.table.decode(raw) {
         Ok((frame, consumed)) if consumed == raw.len() => {
-            let location = state.locations.as_ref().and_then(|l| l.get(&frame.index()));
             let level = match frame.level() {
                 Some(DefmtLevel::Trace) => Level::Trace,
                 Some(DefmtLevel::Debug) => Level::Debug,
@@ -30,17 +29,24 @@ fn emit(raw: &[u8]) {
                 Some(DefmtLevel::Error) => Level::Error,
                 None => Level::Info,
             };
+            let location = state.locations.as_ref().and_then(|l| l.get(&frame.index()));
             let module = location.map(|l| l.module.as_str());
-            log::logger().log(
-                &log::Record::builder()
-                    .args(format_args!("{}", frame.display_message().to_string()))
-                    .level(level)
-                    .target(module.unwrap_or("defmt"))
-                    .module_path(module)
-                    .file(location.and_then(|l| l.file.to_str()))
-                    .line(location.and_then(|l| u32::try_from(l.line).ok()))
-                    .build(),
-            );
+            let metadata = log::MetadataBuilder::new()
+                .level(level)
+                .target(module.unwrap_or("defmt"))
+                .build();
+            let logger = log::logger();
+            if logger.enabled(&metadata) {
+                logger.log(
+                    &log::Record::builder()
+                        .args(format_args!("{}", frame.display_message().to_string()))
+                        .metadata(metadata)
+                        .module_path(module)
+                        .file(location.and_then(|l| l.file.to_str()))
+                        .line(location.and_then(|l| u32::try_from(l.line).ok()))
+                        .build(),
+                );
+            }
         }
         Ok((_frame, consumed)) => {
             log::warn!(

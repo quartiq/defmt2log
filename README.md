@@ -67,6 +67,8 @@ Recommended default:
 The important consequence is simple: `RUST_LOG` cannot bring back `defmt`
 callsites that `DEFMT_LOG` compiled out.
 
+Note that `defmt::println!()` is converted into `INFO` log level messages.
+
 ## Avoid
 
 - `DEFMT_LOG=trace` with `RUST_LOG=warn` unless you intentionally want to pay
@@ -99,6 +101,7 @@ callsites that `DEFMT_LOG` compiled out.
   `.defmt.*` into one real `.defmt` section so `defmt-decoder::Table::parse()`
   can be used directly, but that is not a supported recipe yet
 - every enabled `defmt` frame is decoded in-process
+- `DefmtSymbol::runtime_index` is a `u16` and can collide
 
 ## Alternatives
 
