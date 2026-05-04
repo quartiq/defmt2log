@@ -110,3 +110,13 @@ pub(crate) fn state() -> &'static State {
         .get()
         .expect("defmt2log must be initialized before emitting defmt logs")
 }
+
+#[cfg(test)]
+mod test {
+    #[test]
+    fn smoke() {
+        env_logger::init();
+        crate::init_from_current_exe().unwrap();
+        defmt::info!("word {=u32:#010x}", 0x1234u32);
+    }
+}

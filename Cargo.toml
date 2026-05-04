@@ -8,9 +8,6 @@ repository = "https://github.com/quartiq/defmt2log"
 edition = "2024"
 readme = "README.md"
 
-[lib]
-test = false
-
 [[bin]]
 name = "smoke_helper"
 path = "src/bin/smoke_helper.rs"
