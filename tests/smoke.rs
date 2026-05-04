@@ -52,3 +52,12 @@ fn explicit_elf_path_helper_still_works() {
         .unwrap();
     assert!(output.status.success(), "{output:?}");
 }
+
+#[test]
+fn empty_helper_initializes_with_no_live_entries() {
+    let output = Command::new(env!("CARGO_BIN_EXE_empty_helper"))
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "{output:?}");
+    assert!(output.stderr.is_empty(), "{output:?}");
+}

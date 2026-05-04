@@ -51,6 +51,10 @@ Recommended default:
 - leave `log` compile-time max-level features alone
 - source locations are loaded on a best-effort basis; if they cannot be loaded,
   decoding still works and `defmt2log` warns once
+- if `DEFMT_LOG` is unset or more restrictive than your callsites, normal
+  `defmt::{trace,debug,info,warn,error}!` output is compiled out entirely; in
+  that case `defmt2log` may still initialize successfully, but there is
+  nothing for it to decode
 
 ## Filters
 

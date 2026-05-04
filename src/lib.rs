@@ -39,10 +39,7 @@ impl std::fmt::Display for InitError {
                 write!(f, "failed to parse defmt table: {err}")
             }
             Self::MissingDefmtSection => {
-                write!(
-                    f,
-                    "current executable does not contain any defmt metadata"
-                )
+                write!(f, "current executable does not contain any defmt metadata")
             }
         }
     }

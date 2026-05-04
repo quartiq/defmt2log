@@ -46,8 +46,7 @@ fn emit(raw: &[u8]) {
             let location = location(&frame);
             let module = location.map(|location| location.module.as_str());
             let file = location.and_then(|location| location.file.to_str());
-            let line =
-                location.and_then(|location| u32::try_from(location.line).ok());
+            let line = location.and_then(|location| u32::try_from(location.line).ok());
             let level = level(&frame);
             let message = frame.display_message().to_string();
             let args = format_args!("{message}");
@@ -69,10 +68,7 @@ fn emit(raw: &[u8]) {
             );
         }
         Err(DecodeError::UnexpectedEof) => {
-            log::warn!(
-                "defmt2log saw incomplete raw frame of {} bytes",
-                raw.len()
-            );
+            log::warn!("defmt2log saw incomplete raw frame of {} bytes", raw.len());
         }
         Err(DecodeError::Malformed) => {
             log::warn!(
@@ -108,10 +104,7 @@ unsafe impl Logger for HostLogger {
         THREAD.with(|thread| {
             let raw = {
                 let mut thread = thread.borrow_mut();
-                assert!(
-                    thread.acquired,
-                    "defmt logger released without acquire"
-                );
+                assert!(thread.acquired, "defmt logger released without acquire");
                 thread.acquired = false;
                 std::mem::take(&mut thread.raw)
             };

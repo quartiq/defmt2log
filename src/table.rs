@@ -3,9 +3,8 @@ use std::{collections::HashMap, fs, path::Path, sync::Once};
 use crate::{InitError, State};
 use defmt_decoder::{Locations, StringEntry, Table, TableEntry, Tag};
 use object::{
-    BinaryFormat, Object, ObjectKind, ObjectSection, ObjectSegment,
-    ObjectSymbol, SectionIndex, SectionKind, SymbolFlags, SymbolKind,
-    SymbolScope,
+    BinaryFormat, Object, ObjectKind, ObjectSection, ObjectSegment, ObjectSymbol, SectionIndex,
+    SectionKind, SymbolFlags, SymbolKind, SymbolScope,
     write::{Object as WriteObject, Symbol, SymbolSection},
 };
 
@@ -28,12 +27,8 @@ struct SyntheticInput<'a> {
     path: &'a Path,
 }
 
-pub(crate) fn load_state(
-    elf: &[u8],
-    path: Option<&Path>,
-) -> Result<State, InitError> {
-    let parsed =
-        parse_table(elf, path)?.ok_or(InitError::MissingDefmtSection)?;
+pub(crate) fn load_state(elf: &[u8], path: Option<&Path>) -> Result<State, InitError> {
+    let parsed = parse_table(elf, path)?.ok_or(InitError::MissingDefmtSection)?;
     let locations = match load_locations(elf, &parsed) {
         Ok(locations) => Some(locations),
         Err(err) => {
@@ -49,10 +44,7 @@ pub(crate) fn load_state(
     })
 }
 
-fn parse_table(
-    elf: &[u8],
-    path: Option<&Path>,
-) -> Result<Option<ParsedTable>, InitError> {
+fn parse_table(elf: &[u8], path: Option<&Path>) -> Result<Option<ParsedTable>, InitError> {
     if let Some(table) = parse_merged_table(elf)? {
         return Ok(Some(ParsedTable {
             table,
@@ -70,10 +62,7 @@ fn parse_table(
     SyntheticInput::parse(elf, path)?.build_table()
 }
 
-fn load_locations(
-    elf: &[u8],
-    parsed: &ParsedTable,
-) -> Result<Locations, String> {
+fn load_locations(elf: &[u8], parsed: &ParsedTable) -> Result<Locations, String> {
     let raw_locations = parsed
         .table
         .get_locations(elf)
@@ -82,8 +71,7 @@ fn load_locations(
     if let Some(symbol_indices) = &parsed.symbol_indices {
         let object = object::File::parse(elf).map_err(|err| err.to_string())?;
         let original_addresses = original_symbol_addresses(&object);
-        let original_locations =
-            original_locations_by_symbol(&raw_locations, &original_addresses);
+        let original_locations = original_locations_by_symbol(&raw_locations, &original_addresses);
         let remapped = symbol_indices
             .iter()
             .filter_map(|(name, index)| {
@@ -111,11 +99,7 @@ fn build_synthetic_table(
         object.endianness(),
     );
     synthetic.add_file_symbol(b"defmt2log-synthetic".to_vec());
-    let defmt = synthetic.add_section(
-        Vec::new(),
-        b".defmt".to_vec(),
-        SectionKind::ReadOnlyData,
-    );
+    let defmt = synthetic.add_section(Vec::new(), b".defmt".to_vec(), SectionKind::ReadOnlyData);
 
     let max_size = symbols
         .iter()
@@ -149,14 +133,10 @@ fn build_synthetic_table(
 
         let start = usize::from(symbol.runtime_index);
         let end = start + symbol.data.len();
-        synthetic.section_mut(defmt).data_mut()[start..end]
-            .copy_from_slice(&symbol.data);
+        synthetic.section_mut(defmt).data_mut()[start..end].copy_from_slice(&symbol.data);
     }
 
-    add_metadata_symbol(
-        &mut synthetic,
-        format!("_defmt_encoding_ = {encoding}"),
-    );
+    add_metadata_symbol(&mut synthetic, format!("_defmt_encoding_ = {encoding}"));
     add_metadata_symbol(&mut synthetic, format!("_defmt_version_ = {version}"));
 
     let elf = synthetic
@@ -164,9 +144,7 @@ fn build_synthetic_table(
         .map_err(|err| InitError::ParseTable(err.to_string()))?;
     let mut table = Table::parse(&elf)
         .map_err(|err| InitError::ParseTable(err.to_string()))?
-        .ok_or_else(|| {
-            InitError::ParseTable("synthetic ELF lost `.defmt`".to_owned())
-        })?;
+        .ok_or_else(|| InitError::ParseTable("synthetic ELF lost `.defmt`".to_owned()))?;
     if !table.has_timestamp() {
         table.set_timestamp_entry(host_timestamp_entry());
     }
@@ -195,19 +173,15 @@ impl<'a> SyntheticInput<'a> {
             (true, None) => return Ok(None),
             (true, Some(_)) => {
                 return Err(InitError::ParseTable(
-                    "defmt version found, but no `.defmt.*` sections were found"
-                        .to_owned(),
+                    "defmt version found, but no `.defmt.*` sections were found".to_owned(),
                 ));
             }
             (false, None) => {
                 return Err(InitError::ParseTable(
-                    "found `.defmt.*` sections, but no defmt version symbol"
-                        .to_owned(),
+                    "found `.defmt.*` sections, but no defmt version symbol".to_owned(),
                 ));
             }
-            (false, Some(version))
-                if !defmt_decoder::DEFMT_VERSIONS.contains(&version) =>
-            {
+            (false, Some(version)) if !defmt_decoder::DEFMT_VERSIONS.contains(&version) => {
                 return Err(InitError::ParseTable(format!(
                     "unsupported defmt version {version}"
                 )));
@@ -215,15 +189,10 @@ impl<'a> SyntheticInput<'a> {
             (false, Some(_)) => {}
         }
 
-        let encoding = encoding.ok_or_else(|| {
-            InitError::ParseTable("no defmt encoding symbol found".to_owned())
-        })?;
+        let encoding = encoding
+            .ok_or_else(|| InitError::ParseTable("no defmt encoding symbol found".to_owned()))?;
         let version = version.expect("validated above");
         let symbols = self.collect_symbols(&sections, self.runtime_slide()?)?;
-        if symbols.is_empty() {
-            return Ok(None);
-        }
-
         build_synthetic_table(&self.object, &symbols, &encoding, &version)
     }
 
@@ -263,9 +232,7 @@ impl<'a> SyntheticInput<'a> {
             .filter(|segment| segment.file_range().0 == 0)
             .min_by_key(|segment| segment.address())
             .ok_or_else(|| {
-                InitError::ParseTable(
-                    "no loadable file-offset-zero segment in ELF".to_owned(),
-                )
+                InitError::ParseTable("no loadable file-offset-zero segment in ELF".to_owned())
             })?;
         let runtime_base = mapped_executable_base(self.path)?;
         Ok(runtime_base.wrapping_sub(base_segment.address()))
@@ -297,9 +264,7 @@ impl<'a> SyntheticInput<'a> {
             };
 
             let runtime_index = symbol.address().wrapping_add(slide) as u16;
-            if let Some(old) =
-                seen_indices.insert(runtime_index, name.to_owned())
-            {
+            if let Some(old) = seen_indices.insert(runtime_index, name.to_owned()) {
                 return Err(InitError::ParseTable(format!(
                     "runtime defmt index collision {runtime_index:#06x}: {old} and {name}"
                 )));
@@ -307,13 +272,7 @@ impl<'a> SyntheticInput<'a> {
 
             let size = symbol.size().max(1);
             let data = if tag == Tag::BitflagsValue {
-                symbol_bytes(
-                    &self.object,
-                    name,
-                    section_index,
-                    symbol.address(),
-                    size,
-                )?
+                symbol_bytes(&self.object, name, section_index, symbol.address(), size)?
             } else {
                 vec![0; size as usize]
             };
@@ -356,20 +315,15 @@ fn symbol_bytes(
         .data_range(address, size)
         .map_err(|err| InitError::ParseTable(err.to_string()))?
         .ok_or_else(|| {
-            InitError::ParseTable(format!(
-                "defmt symbol `{}` lies outside its section",
-                name
-            ))
+            InitError::ParseTable(format!("defmt symbol `{}` lies outside its section", name))
         })?;
     Ok(data.to_vec())
 }
 
 fn mapped_executable_base(path: &Path) -> Result<u64, InitError> {
-    let expected =
-        fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
-    let maps = fs::read_to_string("/proc/self/maps").map_err(|err| {
-        InitError::ParseTable(format!("failed to read /proc/self/maps: {err}"))
-    })?;
+    let expected = fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+    let maps = fs::read_to_string("/proc/self/maps")
+        .map_err(|err| InitError::ParseTable(format!("failed to read /proc/self/maps: {err}")))?;
     let mut best: Option<u64> = None;
     for line in maps.lines() {
         let mut parts = line.split_whitespace();
@@ -389,8 +343,7 @@ fn mapped_executable_base(path: &Path) -> Result<u64, InitError> {
             continue;
         }
         let mapped = Path::new(mapped_path);
-        let mapped =
-            fs::canonicalize(mapped).unwrap_or_else(|_| mapped.to_path_buf());
+        let mapped = fs::canonicalize(mapped).unwrap_or_else(|_| mapped.to_path_buf());
         if mapped != expected {
             continue;
         }
@@ -398,9 +351,7 @@ fn mapped_executable_base(path: &Path) -> Result<u64, InitError> {
             continue;
         };
         let start = u64::from_str_radix(start, 16).map_err(|err| {
-            InitError::ParseTable(format!(
-                "failed to parse `/proc/self/maps` address: {err}"
-            ))
+            InitError::ParseTable(format!("failed to parse `/proc/self/maps` address: {err}"))
         })?;
         best = Some(best.map_or(start, |old| old.min(start)));
     }
@@ -413,9 +364,7 @@ fn mapped_executable_base(path: &Path) -> Result<u64, InitError> {
     })
 }
 
-fn original_symbol_addresses(
-    object: &object::File<'_>,
-) -> HashMap<String, u64> {
+fn original_symbol_addresses(object: &object::File<'_>) -> HashMap<String, u64> {
     object
         .symbols()
         .filter_map(|symbol| {
@@ -460,9 +409,7 @@ fn parse_merged_table(elf: &[u8]) -> Result<Option<Table>, InitError> {
 }
 
 fn is_defmt_section(name: &str) -> bool {
-    name == ".defmt"
-        || name.starts_with(".defmt.")
-        || name.starts_with(".defmt,")
+    name == ".defmt" || name.starts_with(".defmt.") || name.starts_with(".defmt,")
 }
 
 fn parse_version(name: &str) -> Option<String> {
