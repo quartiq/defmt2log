@@ -1,0 +1,27 @@
+[package]
+name = "defmt2log"
+version = "0.1.0"
+description = "Adapt full defmt logging to ordinary log records"
+authors = ["Robert Jördens <rj@quartiq.de>"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/quartiq/defmt2log"
+edition = "2024"
+readme = "README.md"
+
+[lib]
+test = false
+
+[[bin]]
+name = "smoke_helper"
+path = "src/bin/smoke_helper.rs"
+test = false
+
+[dependencies]
+defmt = "1.0.1"
+defmt-decoder = "1.1.0"
+defmt-parser = "1.0.0"
+log = "0.4"
+object = { version = "0.36", default-features = false, features = ["elf", "read_core", "std", "write"] }
+
+[dev-dependencies]
+env_logger = "0.11"
