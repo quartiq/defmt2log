@@ -59,11 +59,8 @@ fn emit(raw: &[u8]) {
         }
         Err(defmt_decoder::DecodeError::Malformed) => {
             log::warn!(
-                "defmt2log saw malformed raw frame of {} bytes: {:02x?}; indices={:?}; has_timestamp={}",
+                "defmt2log saw malformed raw frame of {} bytes: {raw:02x?}",
                 raw.len(),
-                raw,
-                state.table.indices().collect::<Vec<_>>(),
-                state.table.has_timestamp()
             );
         }
     }
@@ -89,13 +86,11 @@ unsafe impl defmt::Logger for HostLogger {
 
     unsafe fn release() {
         THREAD.with(|thread| {
-            let raw = {
-                let mut thread = thread.borrow_mut();
-                assert!(thread.acquired, "defmt logger released without acquire");
-                thread.acquired = false;
-                std::mem::take(&mut thread.raw)
-            };
-            emit(&raw);
+            let mut thread = thread.borrow_mut();
+            assert!(thread.acquired, "defmt logger released without acquire");
+            thread.acquired = false;
+            emit(&thread.raw);
+            thread.raw.clear();
         });
     }
 
