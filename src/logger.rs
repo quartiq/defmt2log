@@ -39,7 +39,7 @@ fn emit(raw: &[u8]) {
             if logger.enabled(&metadata) {
                 logger.log(
                     &log::Record::builder()
-                        .args(format_args!("{}", frame.display_message().to_string()))
+                        .args(format_args!("{}", frame.display_message()))
                         .metadata(metadata)
                         .module_path(module)
                         .file(location.and_then(|l| l.file.to_str()))
