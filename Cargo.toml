@@ -21,7 +21,7 @@ defmt = "1.0.1"
 defmt-decoder = "1.1.0"
 defmt-parser = "1.0.0"
 log = "0.4"
-object = { version = "0.36", default-features = false, features = ["elf", "read_core", "std", "write"] }
+object = { version = "0.39", default-features = false, features = ["elf", "read_core", "std", "write"] }
 
 [dev-dependencies]
 env_logger = "0.11"
