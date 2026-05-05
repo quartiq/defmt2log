@@ -365,8 +365,7 @@ fn mapped_executable_base(path: &Path) -> Result<u64> {
         let MMapPath::Path(mapped_path) = map.pathname else {
             continue;
         };
-        let mapped = canonicalize_lenient(&mapped_path);
-        if mapped != expected {
+        if !mapped_path_matches(&mapped_path, &expected) {
             continue;
         }
         best = Some(best.map_or(map.address.0, |old| old.min(map.address.0)));
@@ -382,6 +381,14 @@ fn mapped_executable_base(path: &Path) -> Result<u64> {
 
 fn canonicalize_lenient(path: &Path) -> PathBuf {
     fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
+}
+
+fn mapped_path_matches(mapped_path: &Path, expected: &Path) -> bool {
+    canonicalize_lenient(mapped_path) == expected
+        || mapped_path
+            .to_str()
+            .and_then(|path| path.strip_suffix(" (deleted)"))
+            .is_some_and(|path| canonicalize_lenient(Path::new(path)) == expected)
 }
 
 fn original_symbol_addresses(object: &object::File<'_>) -> HashMap<String, u64> {

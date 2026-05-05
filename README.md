@@ -31,10 +31,8 @@ defmt::info!("word {=u32:#010x}", 0x1234u32);
 - normal debug and release host binaries work as well as libtest unit
   tests, examples, and integration tests; they need one `defmt2log::init_from_*()`
 - rustdoc doctest executables are worse: the bundled doctest rlib still
-  contains `.defmt.info.*`, but the final `rust_out` test executable keeps only
-  `.defmt.end` plus `_defmt_version_` / `_defmt_encoding_`, so there is no
-  table to decode at runtime; those split metadata sections are dead-stripped
-  from the final doctest executable
+  contains `.defmt.info.*`, but the final `rust_out` test executable has
+  them stripped.
 
 Recommended default:
 
@@ -73,7 +71,9 @@ Note that `defmt::println!()` are converted into `INFO` log level messages.
 
 ## Limitations
 
-- doesn't work in doctests yet
+- doctests tend to not produce output:
+  the final doctest executable loses the split `.defmt.*` metadata even when
+  the doctest itself still compiles and passes
 - `defmt2log` is typically less efficient than pure `log`; the overhead is
   the sum of the defmt overheads: encoding, decoding, and formatting
 - every compile-time-enabled `defmt` frame is decoded in-process
