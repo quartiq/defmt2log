@@ -1,18 +1,18 @@
 #![doc = include_str!("../README.md")]
 
-use std::{env, fs, path::Path, sync::OnceLock};
+use std::{env, error::Error, fs, path::Path, sync::OnceLock};
 
 use defmt_decoder::{Locations, Table};
 
 mod logger;
 mod table;
 
-pub(crate) struct State {
+pub(crate) struct Info {
     pub(crate) table: Table,
-    pub(crate) locations: Option<Locations>,
+    pub(crate) locations: Locations,
 }
 
-static STATE: OnceLock<State> = OnceLock::new();
+static INFO: OnceLock<Info> = OnceLock::new();
 
 /// Initialize from the current host executable.
 ///
@@ -50,16 +50,14 @@ fn read_elf(path: &Path) -> Vec<u8> {
         .unwrap_or_else(|err| panic!("defmt2log failed to read ELF {}: {err}", path.display()))
 }
 
-fn init_state(state: Result<State, String>) {
+fn init_state(state: Result<Info, Box<dyn Error>>) {
     let state = state.unwrap_or_else(|err| panic!("defmt2log initialization failed: {err}"));
-    STATE
-        .set(state)
+    INFO.set(state)
         .unwrap_or_else(|_| panic!("defmt2log is already initialized"));
 }
 
-pub(crate) fn state() -> &'static State {
-    STATE
-        .get()
+pub(crate) fn info() -> &'static Info {
+    INFO.get()
         .expect("defmt2log must be initialized before emitting defmt logs")
 }
 

@@ -1,11 +1,11 @@
 use std::{
     collections::HashMap,
+    error::Error,
     fs,
     path::{Path, PathBuf},
-    sync::Once,
 };
 
-use crate::State;
+use crate::Info;
 use defmt_decoder::{Locations, Table, Tag};
 use object::{
     BinaryFormat, Object, ObjectKind, ObjectSection, ObjectSegment, ObjectSymbol, SectionIndex,
@@ -15,9 +15,7 @@ use object::{
 use procfs::process::{MMapPath, Process};
 use serde_json::Value;
 
-static WARNED_LOCATIONS: Once = Once::new();
-
-type Result<T> = std::result::Result<T, String>;
+type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
 struct ParsedTable {
     table: Table,
@@ -41,21 +39,19 @@ struct Metadata {
     encoding: Option<String>,
 }
 
-pub(crate) fn load_host_state(elf: &[u8], path: &Path) -> Result<State> {
+pub(crate) fn load_host_state(elf: &[u8], path: &Path) -> Result<Info> {
     if has_merged_defmt_section(elf)? {
         return load_merged_state(elf);
     }
 
     let parsed = SyntheticInput::parse(elf, path)?
         .build_table()?
-        .ok_or_else(|| "current executable does not contain any defmt metadata".to_owned())?;
+        .ok_or("current executable does not contain any defmt metadata")?;
     build_state(elf, parsed)
 }
 
-pub(crate) fn load_merged_state(elf: &[u8]) -> Result<State> {
-    let table = Table::parse(elf)
-        .map_err(|err| err.to_string())?
-        .ok_or_else(|| "ELF has no merged `.defmt` section".to_owned())?;
+pub(crate) fn load_merged_state(elf: &[u8]) -> Result<Info> {
+    let table = Table::parse(elf)?.ok_or("ELF has no merged `.defmt` section")?;
     build_state(
         elf,
         ParsedTable {
@@ -70,17 +66,12 @@ fn has_merged_defmt_section(elf: &[u8]) -> Result<bool> {
     Ok(object.section_by_name(".defmt").is_some())
 }
 
-fn build_state(elf: &[u8], parsed: ParsedTable) -> Result<State> {
-    let locations = match load_locations(elf, &parsed) {
-        Ok(locations) => Some(locations),
-        Err(err) => {
-            WARNED_LOCATIONS.call_once(|| {
-                log::warn!("defmt2log: failed to load source locations: {err}");
-            });
-            None
-        }
-    };
-    Ok(State {
+fn build_state(elf: &[u8], parsed: ParsedTable) -> Result<Info> {
+    let locations = load_locations(elf, &parsed).unwrap_or_else(|err| {
+        log::warn!("defmt2log: failed to load source locations: {err}");
+        Default::default()
+    });
+    Ok(Info {
         table: parsed.table,
         locations,
     })
@@ -138,10 +129,7 @@ fn build_synthetic_table(
             .insert(symbol.name.clone(), u64::from(symbol.runtime_index))
             .is_some()
         {
-            return Err(format!(
-                "duplicate synthetic defmt symbol name {}",
-                symbol.name
-            ));
+            return Err(format!("duplicate synthetic defmt symbol name {}", symbol.name).into());
         }
 
         synthetic.add_symbol(Symbol {
@@ -166,7 +154,7 @@ fn build_synthetic_table(
     let elf = synthetic.write().map_err(|err| err.to_string())?;
     let table = Table::parse(&elf)
         .map_err(|err| err.to_string())?
-        .ok_or_else(|| "synthetic ELF lost `.defmt`".to_owned())?;
+        .ok_or("synthetic ELF lost `.defmt`")?;
 
     Ok(ParsedTable {
         table,
@@ -189,20 +177,18 @@ impl<'a> SyntheticInput<'a> {
         match (sections.is_empty(), &metadata.version, &metadata.encoding) {
             (true, None, None) => return Ok(None),
             (true, _, _) => {
-                return Err(
-                    "defmt metadata found, but no `.defmt.*` sections were found".to_owned(),
-                );
+                return Err("defmt metadata found, but no `.defmt.*` sections were found".into());
             }
             (false, None, _) => {
-                return Err("found `.defmt.*` sections, but no defmt version symbol".to_owned());
+                return Err("found `.defmt.*` sections, but no defmt version symbol".into());
             }
             (false, _, None) => {
-                return Err("found `.defmt.*` sections, but no defmt encoding symbol".to_owned());
+                return Err("found `.defmt.*` sections, but no defmt encoding symbol".into());
             }
             (false, Some(version), Some(_))
                 if !defmt_decoder::DEFMT_VERSIONS.contains(&version.as_str()) =>
             {
-                return Err(format!("unsupported defmt version {version}"));
+                return Err(format!("unsupported defmt version {version}").into());
             }
             (false, Some(_), Some(_)) => {}
         }
@@ -245,7 +231,8 @@ impl<'a> SyntheticInput<'a> {
                 return Err(format!(
                     "multiple defmt versions in use: {} and {} (only one is supported)",
                     old_version, new_version
-                ));
+                )
+                .into());
             }
 
             if let Some(new_encoding) = parse_encoding(name)
@@ -254,7 +241,8 @@ impl<'a> SyntheticInput<'a> {
                 return Err(format!(
                     "multiple defmt encodings in use: {} and {} (only one is supported)",
                     old_encoding, new_encoding
-                ));
+                )
+                .into());
             }
         }
 
@@ -271,7 +259,7 @@ impl<'a> SyntheticInput<'a> {
             .segments()
             .filter(|segment| segment.file_range().0 == 0)
             .min_by_key(|segment| segment.address())
-            .ok_or_else(|| "no loadable file-offset-zero segment in ELF".to_owned())?;
+            .ok_or("no loadable file-offset-zero segment in ELF")?;
         let runtime_base = mapped_executable_base(self.path)?;
         Ok(runtime_base.wrapping_sub(base_segment.address()))
     }
@@ -301,7 +289,8 @@ impl<'a> SyntheticInput<'a> {
             if let Some(old) = seen_indices.insert(runtime_index, name.to_owned()) {
                 return Err(format!(
                     "runtime defmt index collision {runtime_index:#06x}: {old} and {name}"
-                ));
+                )
+                .into());
             }
 
             let size = symbol.size().max(1);
@@ -376,6 +365,7 @@ fn mapped_executable_base(path: &Path) -> Result<u64> {
             "failed to find offset-zero mapping for {} in /proc/self/maps",
             expected.display()
         )
+        .into()
     })
 }
 

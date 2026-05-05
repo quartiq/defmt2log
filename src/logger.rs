@@ -18,8 +18,8 @@ struct HostLogger;
 defmt::timestamp!("");
 
 fn emit(raw: &[u8]) {
-    let state = crate::state();
-    match state.table.decode(raw) {
+    let info = crate::info();
+    match info.table.decode(raw) {
         Ok((frame, consumed)) if consumed == raw.len() => {
             let level = match frame.level() {
                 Some(DefmtLevel::Trace) => Level::Trace,
@@ -29,7 +29,7 @@ fn emit(raw: &[u8]) {
                 Some(DefmtLevel::Error) => Level::Error,
                 None => Level::Info,
             };
-            let location = state.locations.as_ref().and_then(|l| l.get(&frame.index()));
+            let location = info.locations.get(&frame.index());
             let module = location.map(|l| l.module.as_str());
             let metadata = log::MetadataBuilder::new()
                 .level(level)
@@ -43,7 +43,7 @@ fn emit(raw: &[u8]) {
                         .metadata(metadata)
                         .module_path(module)
                         .file(location.and_then(|l| l.file.to_str()))
-                        .line(location.and_then(|l| u32::try_from(l.line).ok()))
+                        .line(location.and_then(|l| l.line.try_into().ok()))
                         .build(),
                 );
             }
@@ -77,8 +77,8 @@ unsafe impl defmt::Logger for HostLogger {
                 !thread.acquired,
                 "defmt logger acquired twice in one thread"
             );
-            thread.acquired = true;
             assert!(thread.raw.is_empty());
+            thread.acquired = true;
         });
     }
 
@@ -88,9 +88,9 @@ unsafe impl defmt::Logger for HostLogger {
         THREAD.with(|thread| {
             let mut thread = thread.borrow_mut();
             assert!(thread.acquired, "defmt logger released without acquire");
-            thread.acquired = false;
             emit(&thread.raw);
             thread.raw.clear();
+            thread.acquired = false;
         });
     }
 
