@@ -13,18 +13,20 @@ Keep writing real `defmt` in code that also runs on the host.
 Initialization modes:
 
 - `init_from_current_exe()` for the normal host-binary case
-- `init_from_elf_path(path)` for any ELF path with a merged `.defmt` section,
-  and also for the current executable
+- `init_from_merged_elf_path(path)` for any ELF path with a merged `.defmt`
+  section
 - `init_from_merged_elf_bytes(bytes)` for pre-merged ELF bytes
+
+All initialization functions panic on failure. This is intentional: they set up
+one global logger/decoder state and are meant to run during early process
+startup.
 
 ## Usage
 
 ```rust
-fn main() {
-  env_logger::init();
-  defmt2log::init_from_current_exe().unwrap();
-  defmt::info!("word {=u32:#010x}", 0x1234u32);  
-}
+env_logger::init();
+defmt2log::init_from_current_exe();
+defmt::info!("word {=u32:#010x}", 0x1234u32);
 ```
 
 - normal debug and release host binaries work as well as libtest unit
@@ -67,8 +69,8 @@ Note that `defmt::println!()` is converted into `INFO` log level messages.
 - using `max_level_*` features to control `defmt`
 - using `init_from_merged_elf_bytes()` for a normal host executable; that API
   is only for ELFs that already contain a merged `.defmt` section.
-- expecting `init_from_elf_path(path)` to synthesize a table for an arbitrary
-  non-running host binary without a merged `.defmt` section
+- expecting `init_from_merged_elf_path(path)` to synthesize a table for an
+  arbitrary non-running host binary without a merged `.defmt` section
 
 ## Limitations
 
@@ -77,9 +79,10 @@ Note that `defmt::println!()` is converted into `INFO` log level messages.
   the sum of the defmt overheads: serialization, deserialization, and formatting
 - every compile-time-enabled `defmt` frame is decoded in-process
 - `init_from_current_exe()` is Linux-oriented today:
-  the split-`.defmt.*` synthetic fallback depends on `/proc/self/maps`
-- `init_from_elf_path()` and `init_from_merged_elf_bytes()` are the more
-  portable modes: they work when the input already has a merged `.defmt`
+  the split-`.defmt.*` current-executable path depends on Linux process maps
+  via `procfs`
+- `init_from_merged_elf_path()` and `init_from_merged_elf_bytes()` are the
+  more portable modes: they work when the input already has a merged `.defmt`
   section
 - native macOS current-executable support is not a supported path today
 - host bitflags names require linker support that preserves `.defmt.end*`
