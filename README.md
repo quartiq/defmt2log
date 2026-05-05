@@ -2,24 +2,23 @@
 
 Keep writing real `defmt` in code that also runs on the host.
 
-`defmt2log` lets a host binary decode those `defmt` frames and emit ordinary
-[`log`](https://docs.rs/log) records, so you keep:
+`defmt2log` is a `defmt::Logger`/`#[global_logger]` that decodes
+`defmt` frames and emits ordinary [`log`](https://docs.rs/log) records,
+so you keep:
 
 - full `defmt` format hints and syntax in the code
 - `DEFMT_LOG` compile-time filtering
 - normal host `log` tooling such as `RUST_LOG`, `env_logger`, and downstream
   `log` sinks
 
-Initialization modes:
+On Linux/ELF it can initialize without a special linker script in many cases:
 
 - `init_from_current_exe()` for the normal host-binary case
 - `init_from_merged_elf_path(path)` for any ELF path with a merged `.defmt`
   section
 - `init_from_merged_elf_bytes(bytes)` for pre-merged ELF bytes
 
-All initialization functions panic on failure. This is intentional: they set up
-one global logger/decoder state and are meant to run during early process
-startup.
+All initialization functions panic on failure.
 
 ## Usage
 
@@ -30,7 +29,7 @@ defmt::info!("word {=u32:#010x}", 0x1234u32);
 ```
 
 - normal debug and release host binaries work as well as libtest unit
-  tests, examples, and integration tests; they need `defmt2log::init_from_*()`
+  tests, examples, and integration tests; they need one `defmt2log::init_from_*()`
 - rustdoc doctest executables are worse: the bundled doctest rlib still
   contains `.defmt.info.*`, but the final `rust_out` test executable keeps only
   `.defmt.end` plus `_defmt_version_` / `_defmt_encoding_`, so there is no
@@ -40,7 +39,7 @@ defmt::info!("word {=u32:#010x}", 0x1234u32);
 Recommended default:
 
 - build with `DEFMT_LOG=info`
-- run with `RUST_LOG=info`
+- run with `RUST_LOG=info` (when using `env_logger`)
 - leave `log` compile-time max-level features alone
 - source locations are loaded on a best-effort basis; if they cannot be loaded,
   decoding still works and `defmt2log` warns once
@@ -53,14 +52,14 @@ Recommended default:
 ## Filters
 
 - `DEFMT_LOG` is the compile-time filter for `defmt`
-- `RUST_LOG` is the runtime filter for the host `log` sink
+- `RUST_LOG` is the runtime filter for the host `env_logger` `log` sink
 - `max_level_*` and `release_max_level_*` affect ordinary host `log` callsites,
   not `defmt`
 
 The important consequence is simple: `RUST_LOG` cannot bring back `defmt`
 callsites that `DEFMT_LOG` compiled out.
 
-Note that `defmt::println!()` is converted into `INFO` log level messages.
+Note that `defmt::println!()` are converted into `INFO` log level messages.
 
 ## Avoid
 
@@ -74,9 +73,9 @@ Note that `defmt::println!()` is converted into `INFO` log level messages.
 
 ## Limitations
 
-- no doctests yet
-- `defmt2log` typically less efficient than pure `log`; the overhead is
-  the sum of the defmt overheads: serialization, deserialization, and formatting
+- doesn't work in doctests yet
+- `defmt2log` is typically less efficient than pure `log`; the overhead is
+  the sum of the defmt overheads: encoding, decoding, and formatting
 - every compile-time-enabled `defmt` frame is decoded in-process
 - `init_from_current_exe()` is Linux-oriented today:
   the split-`.defmt.*` current-executable path depends on Linux process maps
