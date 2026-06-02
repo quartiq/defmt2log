@@ -7,12 +7,12 @@ use std::{
 
 use crate::Info;
 use defmt_decoder::{Locations, Table, Tag};
+use findshlibs::{IterationControl, SharedLibrary, TargetSharedLibrary};
 use object::{
-    BinaryFormat, Object, ObjectKind, ObjectSection, ObjectSegment, ObjectSymbol, SectionIndex,
-    SectionKind, SymbolFlags, SymbolKind, SymbolScope,
+    BinaryFormat, Object, ObjectKind, ObjectSection, ObjectSymbol, SectionIndex, SectionKind,
+    SymbolFlags, SymbolKind, SymbolScope,
     write::{Object as WriteObject, Symbol, SymbolSection},
 };
-use procfs::process::{MMapPath, Process};
 use serde_json::Value;
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
@@ -254,14 +254,7 @@ impl<'a> SyntheticInput<'a> {
             return Ok(0);
         }
 
-        let base_segment = self
-            .object
-            .segments()
-            .filter(|segment| segment.file_range().0 == 0)
-            .min_by_key(|segment| segment.address())
-            .ok_or("no loadable file-offset-zero segment in ELF")?;
-        let runtime_base = mapped_executable_base(self.path)?;
-        Ok(runtime_base.wrapping_sub(base_segment.address()))
+        mapped_executable_slide(self.path)
     }
 
     fn collect_symbols(&self, sections: &[SectionIndex], slide: u64) -> Result<Vec<DefmtSymbol>> {
@@ -341,28 +334,21 @@ fn symbol_bytes(
     Ok(data.to_vec())
 }
 
-fn mapped_executable_base(path: &Path) -> Result<u64> {
+fn mapped_executable_slide(path: &Path) -> Result<u64> {
     let expected = canonicalize_lenient(path);
-    let maps = Process::myself()
-        .and_then(|process| process.maps())
-        .map_err(|err| format!("failed to read /proc/self/maps via procfs: {err}"))?;
-    let mut best: Option<u64> = None;
-    for map in maps {
-        if map.offset != 0 {
-            continue;
-        };
-        let MMapPath::Path(mapped_path) = map.pathname else {
-            continue;
-        };
-        if !mapped_path_matches(&mapped_path, &expected) {
-            continue;
+    let mut slide = None;
+    TargetSharedLibrary::each(|library| {
+        if mapped_path_matches(Path::new(library.name()), &expected) {
+            slide = Some(library.virtual_memory_bias().0 as u64);
+            IterationControl::Break
+        } else {
+            IterationControl::Continue
         }
-        best = Some(best.map_or(map.address.0, |old| old.min(map.address.0)));
-    }
+    });
 
-    best.ok_or_else(|| {
+    slide.ok_or_else(|| {
         format!(
-            "failed to find offset-zero mapping for {} in /proc/self/maps",
+            "failed to find loader mapping for {} via findshlibs",
             expected.display()
         )
         .into()

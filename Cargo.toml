@@ -13,8 +13,8 @@ defmt = "1.0.1"
 defmt-decoder = "1.1.0"
 defmt-parser = "1.0.0"
 log = "0.4"
+findshlibs = "0.10"
 object = { version = "0.39", default-features = false, features = ["elf", "read_core", "std", "write"] }
-procfs = { version = "0.18", default-features = false }
 serde_json = "1"
 
 [dev-dependencies]

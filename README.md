@@ -78,8 +78,8 @@ Note that `defmt::println!()` are converted into `INFO` log level messages.
   the sum of the defmt overheads: encoding, decoding, and formatting
 - every compile-time-enabled `defmt` frame is decoded in-process
 - `init_from_current_exe()` is Linux-oriented today:
-  the split-`.defmt.*` current-executable path depends on Linux process maps
-  via `procfs`
+  the split-`.defmt.*` current-executable path depends on loader-reported
+  mappings via `findshlibs`
 - `init_from_merged_elf_path()` and `init_from_merged_elf_bytes()` are the
   more portable modes: they work when the input already has a merged `.defmt`
   section
