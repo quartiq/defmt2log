@@ -1,6 +1,6 @@
 use defmt_parser::Level as DefmtLevel;
 use log::Level;
-use std::cell::RefCell;
+use std::{cell::RefCell, io::Write};
 
 #[derive(Default)]
 struct ThreadState {
@@ -21,31 +21,10 @@ fn emit(raw: &[u8]) {
     let info = crate::info();
     match info.table.decode(raw) {
         Ok((frame, consumed)) if consumed == raw.len() => {
-            let level = match frame.level() {
-                Some(DefmtLevel::Trace) => Level::Trace,
-                Some(DefmtLevel::Debug) => Level::Debug,
-                Some(DefmtLevel::Info) => Level::Info,
-                Some(DefmtLevel::Warn) => Level::Warn,
-                Some(DefmtLevel::Error) => Level::Error,
-                None => Level::Info,
-            };
             let location = info.locations.get(&frame.index());
-            let module = location.map(|l| l.module.as_str());
-            let metadata = log::MetadataBuilder::new()
-                .level(level)
-                .target(module.unwrap_or("defmt"))
-                .build();
-            let logger = log::logger();
-            if logger.enabled(&metadata) {
-                logger.log(
-                    &log::Record::builder()
-                        .args(format_args!("{}", frame.display_message()))
-                        .metadata(metadata)
-                        .module_path(module)
-                        .file(location.and_then(|l| l.file.to_str()))
-                        .line(location.and_then(|l| l.line.try_into().ok()))
-                        .build(),
-                );
+            match frame.level() {
+                Some(level) => emit_log(&frame, level, location),
+                None => print_frame(&frame, location),
             }
         }
         Ok((_frame, consumed)) => {
@@ -63,6 +42,55 @@ fn emit(raw: &[u8]) {
                 raw.len(),
             );
         }
+    }
+}
+
+fn emit_log(
+    frame: &defmt_decoder::Frame<'_>,
+    level: DefmtLevel,
+    location: Option<&defmt_decoder::Location>,
+) {
+    let level = match level {
+        DefmtLevel::Trace => Level::Trace,
+        DefmtLevel::Debug => Level::Debug,
+        DefmtLevel::Info => Level::Info,
+        DefmtLevel::Warn => Level::Warn,
+        DefmtLevel::Error => Level::Error,
+    };
+    let module = location.map(|l| l.module.as_str());
+    let metadata = log::MetadataBuilder::new()
+        .level(level)
+        .target(module.unwrap_or("defmt"))
+        .build();
+    let logger = log::logger();
+    if logger.enabled(&metadata) {
+        logger.log(
+            &log::Record::builder()
+                .args(format_args!("{}", frame.display_message()))
+                .metadata(metadata)
+                .module_path(module)
+                .file(location.and_then(|l| l.file.to_str()))
+                .line(location.and_then(|l| l.line.try_into().ok()))
+                .build(),
+        );
+    }
+}
+
+fn print_frame(frame: &defmt_decoder::Frame<'_>, location: Option<&defmt_decoder::Location>) {
+    let mut stdout = std::io::stdout().lock();
+    writeln!(stdout, "{}", frame.display_message()).ok();
+    if let Some(location) = location {
+        write!(
+            stdout,
+            "  at {} @ {}",
+            location.module,
+            location.file.display()
+        )
+        .ok();
+        if let Ok(line) = u32::try_from(location.line) {
+            write!(stdout, ":{line}").ok();
+        }
+        writeln!(stdout).ok();
     }
 }
 

@@ -57,7 +57,8 @@ Recommended default:
 The important consequence is simple: `RUST_LOG` cannot bring back `defmt`
 callsites that `DEFMT_LOG` compiled out.
 
-Note that `defmt::println!()` are converted into `INFO` log level messages.
+`defmt::println!()` is decoded and printed directly to stdout, bypassing
+`RUST_LOG`, with best-effort source location metadata.
 
 ## Avoid
 

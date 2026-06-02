@@ -68,5 +68,6 @@ mod test {
         env_logger::init();
         crate::init_from_current_exe();
         defmt::info!("word {=u32:#010x}", 0x1234u32);
+        defmt::println!("always printed {=u8}", 7u8);
     }
 }
