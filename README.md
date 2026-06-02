@@ -88,11 +88,8 @@ callsites that `DEFMT_LOG` compiled out.
 - host bitflags names require linker support that preserves `.defmt.end*`
   metadata; without that, host decoders only see the bitflags format tag and
   fall back to the raw numeric value
-- a future host-side linker setup may preserve `.defmt.end*` and merge
-  `.defmt.*` into one real `.defmt` section so `defmt-decoder::Table::parse()`
-  can be used directly, but that is not a supported recipe yet
-- With the synthesized table, the naive unmerged `DefmtSymbol::runtime_index: u16`
-  can collide
+- dynamically loaded objects are not gathered today; `init_from_current_exe()`
+  only decodes metadata from the main executable
 
 ## Alternatives
 
