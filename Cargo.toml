@@ -1,6 +1,6 @@
 [package]
 name = "defmt2log"
-version = "0.2.0"
+version = "0.2.1"
 description = "Adapt full defmt logging to ordinary log records"
 authors = ["Robert Jördens <rj@quartiq.de>"]
 license = "MIT OR Apache-2.0"
