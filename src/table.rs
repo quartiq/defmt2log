@@ -11,26 +11,30 @@ use findshlibs::{IterationControl, SharedLibrary, TargetSharedLibrary};
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
 pub(crate) fn load_host_state(elf: &[u8], path: &Path) -> Result<Info> {
-    // Split host metadata uses the loaded address of each `.defmt.*` symbol as
-    // the runtime frame index. `findshlibs` gives us the loader bias for this
-    // running executable; merged-ELF modes below do not need loader state.
+    // Host frames contain loaded PIE addresses truncated to u16. The decoder
+    // table uses linked symbol VMAs, so normalize frame indices at the stream
+    // boundary before decoding.
     let load_bias = mapped_executable_slide(path)?;
-    let table = Table::parse_with_load_bias(elf, load_bias)?
-        .ok_or("current executable does not contain any defmt metadata")?;
-    build_state(elf, table)
+    let table =
+        Table::parse(elf)?.ok_or("current executable does not contain any defmt metadata")?;
+    build_state(elf, table, load_bias as u16)
 }
 
 pub(crate) fn load_merged_state(elf: &[u8]) -> Result<Info> {
     let table = Table::parse(elf)?.ok_or("ELF has no merged `.defmt` section")?;
-    build_state(elf, table)
+    build_state(elf, table, 0)
 }
 
-fn build_state(elf: &[u8], table: Table) -> Result<Info> {
+fn build_state(elf: &[u8], table: Table, frame_index_bias: u16) -> Result<Info> {
     let locations = table.get_locations(elf).unwrap_or_else(|err| {
         log::warn!("defmt2log: failed to load source locations: {err}");
         Default::default()
     });
-    Ok(Info { table, locations })
+    Ok(Info {
+        table,
+        locations,
+        frame_index_bias,
+    })
 }
 
 fn mapped_executable_slide(path: &Path) -> Result<u64> {
