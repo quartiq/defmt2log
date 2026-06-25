@@ -5,7 +5,7 @@ use std::{
 };
 
 use crate::Info;
-use defmt_decoder::Table;
+use defmt_decoder::{DecodeOptions, Table};
 use findshlibs::{IterationControl, SharedLibrary, TargetSharedLibrary};
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
@@ -17,7 +17,7 @@ pub(crate) fn load_host_state(elf: &[u8], path: &Path) -> Result<Info> {
     let load_bias = mapped_executable_slide(path)?;
     let table =
         Table::parse(elf)?.ok_or("current executable does not contain any defmt metadata")?;
-    build_state(elf, table, load_bias as u16)
+    build_state(elf, table, load_bias)
 }
 
 pub(crate) fn load_merged_state(elf: &[u8]) -> Result<Info> {
@@ -25,15 +25,16 @@ pub(crate) fn load_merged_state(elf: &[u8]) -> Result<Info> {
     build_state(elf, table, 0)
 }
 
-fn build_state(elf: &[u8], table: Table, frame_index_bias: u16) -> Result<Info> {
+fn build_state(elf: &[u8], table: Table, address_bias: u64) -> Result<Info> {
     let locations = table.get_locations(elf).unwrap_or_else(|err| {
         log::warn!("defmt2log: failed to load source locations: {err}");
         Default::default()
     });
+    let decode_index = table.new_decode_index(DecodeOptions::new().address_bias(address_bias));
     Ok(Info {
         table,
+        decode_index,
         locations,
-        frame_index_bias,
     })
 }
 

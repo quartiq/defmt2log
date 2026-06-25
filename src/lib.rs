@@ -2,15 +2,15 @@
 
 use std::{env, error::Error, fs, path::Path, sync::OnceLock};
 
-use defmt_decoder::{Locations, Table};
+use defmt_decoder::{DecodeIndex, Locations, Table};
 
 mod logger;
 mod table;
 
 pub(crate) struct Info {
     pub(crate) table: Table,
+    pub(crate) decode_index: DecodeIndex,
     pub(crate) locations: Locations,
-    pub(crate) frame_index_bias: u16,
 }
 
 static INFO: OnceLock<Info> = OnceLock::new();
@@ -72,7 +72,7 @@ mod test {
         },
     };
 
-    use defmt_decoder::{Location, Locations, Table};
+    use defmt_decoder::{DecodeOptions, Location, Locations, Table};
     use log::{Level, LevelFilter, Metadata, Record};
 
     static LOGGER: TestLogger = TestLogger {
@@ -187,10 +187,12 @@ mod test {
             },
         )]);
 
+        let decode_index = table.new_decode_index(DecodeOptions::new().address_bias(3));
+
         super::Info {
             table,
+            decode_index,
             locations,
-            frame_index_bias: 3,
         }
     }
 

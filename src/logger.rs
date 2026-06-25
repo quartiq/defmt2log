@@ -20,7 +20,7 @@ defmt::timestamp!("");
 pub(crate) fn emit(raw: &[u8]) {
     let info = crate::info();
 
-    match info.table.decode_with_bias(raw, info.frame_index_bias) {
+    match info.table.decode_with_index(raw, &info.decode_index) {
         Ok((frame, consumed)) if consumed == raw.len() => {
             let location = info.locations.get(&frame.index());
             match frame.level() {
