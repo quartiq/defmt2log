@@ -1,3 +1,4 @@
+use crate::STATE;
 use defmt_parser::Level as DefmtLevel;
 use log::Level;
 use std::{cell::RefCell, io::Write};
@@ -17,12 +18,12 @@ struct HostLogger;
 
 defmt::timestamp!("");
 
-pub(crate) fn emit(raw: &[u8]) {
-    let info = crate::info();
+fn emit(raw: &[u8]) {
+    let state = &STATE;
 
-    match info.table.decode_with_index(raw, &info.decode_index) {
+    match state.table.decode_with_index(raw, &state.decode_index) {
         Ok((frame, consumed)) if consumed == raw.len() => {
-            let location = info.locations.get(&frame.index());
+            let location = state.locations.get(&frame.index());
             match frame.level() {
                 Some(level) => emit_log(&frame, level, location),
                 None => print_frame(&frame, location),
