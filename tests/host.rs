@@ -2,6 +2,15 @@ use std::sync::Mutex;
 
 use log::{Level, LevelFilter, Metadata, Record};
 
+defmt::timestamp!("{=u32}", 0x1234_5678u32);
+
+defmt::bitflags! {
+    struct Flags: u8 {
+        const A = 1;
+        const B = 2;
+    }
+}
+
 static LOGGER: TestLogger = TestLogger {
     records: Mutex::new(Vec::new()),
 };
@@ -40,15 +49,18 @@ impl log::Log for TestLogger {
 
 #[test]
 fn defmt_records_are_forwarded_to_log() {
-    LOGGER.install();
     defmt2log::init();
+    LOGGER.install();
 
     defmt::error!("word {=u32:#010x}", 0x1234u32);
+    defmt::error!("flags {}", Flags::A | Flags::B);
 
     let records = LOGGER.take();
-    let [(level, message)] = records.as_slice() else {
+    let [(word_level, word_message), (flags_level, flags_message)] = records.as_slice() else {
         panic!("unexpected log records: {records:?}");
     };
-    assert_eq!(*level, Level::Error);
-    assert_eq!(message, "word 0x00001234");
+    assert_eq!(*word_level, Level::Error);
+    assert_eq!(word_message, "word 0x00001234");
+    assert_eq!(*flags_level, Level::Error);
+    assert_eq!(flags_message, "flags A | B");
 }

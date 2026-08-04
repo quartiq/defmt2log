@@ -20,6 +20,10 @@ defmt::info!("word {=u32:#010x}", 0x1234u32);
 optional: the first defmt frame initializes lazily too. Call it explicitly when
 initialization errors should happen before the first log.
 
+Unlike an embedded binary linked with `defmt.x`, a host binary has no linker
+provided default timestamp. The application must define one; use
+`defmt::timestamp!("")` if no timestamp should be encoded.
+
 Typical setup:
 
 - build with `DEFMT_LOG=info`

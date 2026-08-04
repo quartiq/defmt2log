@@ -16,8 +16,6 @@ thread_local! {
 #[defmt::global_logger]
 struct HostLogger;
 
-defmt::timestamp!("");
-
 fn emit(raw: &[u8]) {
     let state = &STATE;
 
