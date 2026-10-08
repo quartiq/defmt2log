@@ -2,13 +2,13 @@
 
 use std::{env, error::Error, fs, sync::LazyLock};
 
-use defmt_decoder::{DecodeIndex, Locations, Table};
+use defmt_decoder::{DecodeContext, Locations, Table};
 
 mod logger;
 
 pub(crate) struct State {
     pub(crate) table: Table,
-    pub(crate) decode_index: DecodeIndex,
+    pub(crate) decode_context: DecodeContext,
     pub(crate) locations: Locations,
 }
 
@@ -28,8 +28,8 @@ fn load_current_exe() -> Result<State, Box<dyn Error>> {
     let elf = fs::read(path)?;
     let table =
         Table::parse(&elf)?.ok_or("current executable does not contain any defmt metadata")?;
-    let decode_index = table
-        .new_decode_index_for_runtime_anchor(defmt::runtime_anchor() as u64)
+    let decode_context = table
+        .new_decode_context_for_runtime_anchor(defmt::runtime_anchor() as u64)
         .ok_or("current executable defmt metadata does not contain a runtime anchor")?;
     let locations = table.get_locations(&elf).unwrap_or_else(|err| {
         log::warn!("defmt2log: failed to load source locations: {err}");
@@ -37,7 +37,7 @@ fn load_current_exe() -> Result<State, Box<dyn Error>> {
     });
     Ok(State {
         table,
-        decode_index,
+        decode_context,
         locations,
     })
 }

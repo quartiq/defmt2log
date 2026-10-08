@@ -19,7 +19,7 @@ struct HostLogger;
 fn emit(raw: &[u8]) {
     let state = &STATE;
 
-    match state.table.decode_with_index(raw, &state.decode_index) {
+    match state.table.decode_with_context(raw, &state.decode_context) {
         Ok((frame, consumed)) if consumed == raw.len() => {
             let location = state.locations.get(&frame.index());
             match frame.level() {
