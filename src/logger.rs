@@ -110,6 +110,14 @@ unsafe impl defmt::Logger for HostLogger {
         });
     }
 
+    unsafe fn write(bytes: &[u8]) {
+        THREAD.with(|thread| {
+            let mut thread = thread.borrow_mut();
+            assert!(thread.acquired, "defmt logger write without acquire");
+            thread.raw.extend_from_slice(bytes);
+        });
+    }
+
     unsafe fn flush() {}
 
     unsafe fn release() {
@@ -119,14 +127,6 @@ unsafe impl defmt::Logger for HostLogger {
             emit(&thread.raw);
             thread.raw.clear();
             thread.acquired = false;
-        });
-    }
-
-    unsafe fn write(bytes: &[u8]) {
-        THREAD.with(|thread| {
-            let mut thread = thread.borrow_mut();
-            assert!(thread.acquired, "defmt logger write without acquire");
-            thread.raw.extend_from_slice(bytes);
         });
     }
 }

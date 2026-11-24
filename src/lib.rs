@@ -1,6 +1,6 @@
 #![doc = include_str!("../README.md")]
 
-use std::{env, error::Error, fs, sync::LazyLock};
+use std::sync::LazyLock;
 
 use defmt_decoder::{DecodeContext, Locations, Table};
 
@@ -23,9 +23,9 @@ pub fn init() {
     LazyLock::force(&STATE);
 }
 
-fn load_current_exe() -> Result<State, Box<dyn Error>> {
-    let path = env::current_exe()?;
-    let elf = fs::read(path)?;
+fn load_current_exe() -> Result<State, Box<dyn core::error::Error>> {
+    let path = std::env::current_exe()?;
+    let elf = std::fs::read(path)?;
     let table =
         Table::parse(&elf)?.ok_or("current executable does not contain any defmt metadata")?;
     let decode_context = table
